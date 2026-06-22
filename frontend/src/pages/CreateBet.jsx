@@ -16,13 +16,44 @@ export default function CreateBet() {
     deadline: '',
     creator_side: 'a',
   })
+  const [validation, setValidation] = useState(null) // { valid, reason }
+  const [validating, setValidating] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }))
+    setValidation(null) // reset validation si le formulaire change
+  }
+
+  const validate = async () => {
+    if (!form.title || !form.side_a_label || !form.side_b_label) {
+      setError('Remplis au minimum le titre et les deux côtés.')
+      return
+    }
+    setError('')
+    setValidating(true)
+    setValidation(null)
+    try {
+      const r = await api.post('/bets/validate', {
+        title: form.title,
+        description: form.description,
+        side_a_label: form.side_a_label,
+        side_b_label: form.side_b_label,
+      })
+      setValidation(r.data)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Erreur de validation')
+    } finally {
+      setValidating(false)
+    }
+  }
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!validation?.valid) return
     setError('')
+    setSubmitting(true)
     try {
       const payload = { ...form, stake: parseFloat(form.stake) }
       const r = await api.post('/bets/', payload)
@@ -30,6 +61,8 @@ export default function CreateBet() {
       navigate(`/bet/${r.data.id}`)
     } catch (err) {
       setError(err.response?.data?.detail || 'Erreur lors de la création')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -84,8 +117,44 @@ export default function CreateBet() {
             <input type="datetime-local" min={minDateStr} value={form.deadline} onChange={e => set('deadline', e.target.value)} required />
           </div>
         </div>
+
         {error && <p className="error">{error}</p>}
-        <button type="submit">Proposer le pari</button>
+
+        {/* Résultat de validation */}
+        {validation && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div className={`validation-result ${validation.valid ? 'valid' : 'invalid'}`}>
+              <span className="validation-icon">{validation.valid ? '✅' : '❌'}</span>
+              <span>{validation.reason}</span>
+            </div>
+            {validation.valid && validation.suggested_deadline && (
+              <div className="validation-result deadline-suggestion">
+                <span className="validation-icon">📅</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ marginBottom: '0.35rem' }}>{validation.deadline_reason}</div>
+                  <button
+                    type="button"
+                    className="btn-use-deadline"
+                    onClick={() => set('deadline', validation.suggested_deadline.slice(0, 16))}
+                  >
+                    Utiliser : {new Date(validation.suggested_deadline).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bouton valider ou soumettre */}
+        {!validation?.valid ? (
+          <button type="button" className="btn-validate-ai" onClick={validate} disabled={validating}>
+            {validating ? '⏳ Vérification…' : '🤖 Vérifier avec ChatGPT'}
+          </button>
+        ) : (
+          <button type="submit" disabled={submitting}>
+            {submitting ? '⏳ Création…' : '✅ Confirmer et proposer le pari'}
+          </button>
+        )}
       </form>
     </div>
   )

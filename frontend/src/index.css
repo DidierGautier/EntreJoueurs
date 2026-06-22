@@ -156,6 +156,15 @@ button:hover { background: var(--accent-hover); }
 .side-opt:hover { border-color: var(--accent); }
 .side-opt.sel-a { border-color: var(--green); color: var(--green); background: rgba(16,185,129,0.08); }
 .side-opt.sel-b { border-color: var(--red); color: var(--red); background: rgba(239,68,68,0.08); }
+.btn-validate-ai { background: var(--surface2); border: 1px solid var(--blue); color: var(--blue); width: 100%; }
+.btn-validate-ai:hover:not(:disabled) { background: rgba(108,99,255,0.15); }
+.btn-validate-ai:disabled { opacity: 0.6; cursor: wait; }
+.validation-result { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.88rem; line-height: 1.4; }
+.validation-result.valid { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: var(--green); }
+.validation-result.invalid { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: var(--red); }
+.validation-icon { font-size: 1rem; flex-shrink: 0; }
+.validation-result.deadline-suggestion { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); color: var(--text); }
+.btn-use-deadline { background: var(--accent); color: #000; padding: 0.3rem 0.75rem; font-size: 0.8rem; border-radius: 6px; }
 
 /* ADMIN */
 .admin-page { max-width: 700px; margin: 0 auto; padding: 2rem 1rem; }
@@ -168,3 +177,6 @@ button:hover { background: var(--accent-hover); }
 .btn-resolve-a:hover { background: #0d9e6e; }
 .btn-resolve-b { background: var(--red); color: white; flex: 1; }
 .btn-resolve-b:hover { background: #dc2626; }
+.btn-ai-resolve { background: var(--surface2); border: 1px solid var(--blue); color: var(--blue); flex: 1.5; }
+.btn-ai-resolve:hover:not(:disabled) { background: rgba(108,99,255,0.15); }
+.btn-ai-resolve:disabled { opacity: 0.6; cursor: wait; }

@@ -1,8 +1,12 @@
+import os
+import json
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from openai import AsyncOpenAI
+from pydantic import BaseModel
 
 from database import get_db
 from models import User, Bet, BetEntry, Transaction, BetStatus, TransactionType
@@ -10,6 +14,63 @@ from schemas import BetCreate, BetOut, ResolvePayload
 from auth import get_current_user, optional_user
 
 router = APIRouter(prefix="/api/bets", tags=["bets"])
+
+class BetValidationRequest(BaseModel):
+    title: str
+    description: str = ""
+    side_a_label: str
+    side_b_label: str
+
+@router.post("/validate")
+async def validate_bet(
+    data: BetValidationRequest,
+    _: User = Depends(get_current_user),
+):
+    key = os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY non configurée")
+
+    client = AsyncOpenAI(api_key=key)
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    prompt = f"""Tu es un arbitre de paris. Évalue si ce pari est valide et propose une date d'expiration adaptée.
+
+Date du jour : {today}
+Titre : {data.title}
+Description : {data.description or "(aucune)"}
+Côté A : {data.side_a_label}
+Côté B : {data.side_b_label}
+
+Un pari est valide si :
+- Son énoncé est clair et compréhensible
+- Les deux côtés sont bien définis et opposés
+- Le résultat peut être déterminé objectivement (événement factuel, pas subjectif)
+- Il n'est pas contraire à l'éthique ou illégal
+
+Pour la deadline : propose la date/heure à laquelle le résultat sera connu avec certitude.
+Par exemple, pour un match de foot prévu le soir même, propose la fin du match + 1h.
+Si tu ne peux pas estimer de date précise, mets null.
+La date doit être au format ISO 8601 : "YYYY-MM-DDTHH:MM:00"
+
+Réponds UNIQUEMENT en JSON (sans markdown) :
+{{"valid": true ou false, "reason": "explication courte en français (1-2 phrases max)", "suggested_deadline": "YYYY-MM-DDTHH:MM:00" ou null, "deadline_reason": "pourquoi cette date (1 phrase)"}}"""
+
+    response = await client.chat.completions.create(
+        model="gpt-4o",
+        max_tokens=200,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+    )
+
+    try:
+        result = json.loads(response.choices[0].message.content)
+        return {
+            "valid": bool(result.get("valid")),
+            "reason": result.get("reason", ""),
+            "suggested_deadline": result.get("suggested_deadline"),
+            "deadline_reason": result.get("deadline_reason", ""),
+        }
+    except Exception:
+        raise HTTPException(status_code=502, detail="Réponse IA invalide")
 
 @router.get("/", response_model=list[BetOut])
 async def list_bets(
